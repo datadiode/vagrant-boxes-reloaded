@@ -1,33 +1,65 @@
 version: '1.0.{build}-{branch}'
-image: Windows Server 2019
+image: Visual Studio 2017
 
-# RDP Debugging
-init:
-  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-#on_finish:
-#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+configuration:
+  - datadiode/MX-23
+  - datadiode/MX-25
+  - datadiode/Peppermint-2023
+  - datadiode/Peppermint-2025
+  - datadiode/Sparky-7
+  - datadiode/Sparky-8
+  - datadiode/Sparky-9
+  - datadiode/w7sbash
+  - datadiode/w8sbash
+  - datadiode/w9sbash
+  - datadiode/w10sbash
+  - datadiode/w11sbash
+  - datadiode/w11sbash-eval
+
+platform:
+  - 001
+  - 002
+  - 003
+  - 004
+  - 005
+  - 006
+
+for:
+-
+  matrix:
+    except:
+      - platform: 001
+
+  skip_non_tags: true
 
 cache:
-  - C:\ProgramData\chocolatey\lib
   - C:\Vagrant
-  - C:\Users\appveyor\.vagrant.d
+
+init:
+  - set APPVEYOR_CACHE_SKIP_SAVE=%APPVEYOR_REPO_TAG%
 
 install:
-  # Disable Hyper-V
-  #- dism.exe /Online /Disable-Feature:Microsoft-Hyper-V /Quiet
-  - ps: mkdir C:\Users\appveyor\.vagrant.d | Out-Null
-    # Disable chocolatey´s verbose download output
-  - choco feature disable --name showDownloadProgress
   - choco install virtualbox --yes
-  - ps: Start-FileDownload "https://releases.hashicorp.com/vagrant/2.2.7/vagrant_2.2.7_x86_64.msi"
-  - ps: Start-Process -FilePath "msiexec.exe" -ArgumentList "/a vagrant_2.2.7_x86_64.msi /qb TARGETDIR=C:\Vagrant" -Wait
-  - set PATH=C:\Vagrant\HashiCorp\Vagrant\bin;C:\VBox;%PATH%
-  # Vagrant correctly installed?
+  - set PATH=C:\Vagrant\Vagrant\bin;%PATH%
+  - where vagrant || curl -LO https://releases.hashicorp.com/vagrant/2.4.9/vagrant_2.4.9_windows_amd64.msi && msiexec.exe /a vagrant_2.4.9_windows_amd64.msi /qb TARGETDIR=C:\Vagrant
   - vagrant --version
-  - ssh -V
-  - ipconfig /all
+  - for %%f in ("C:\Vagrant\Vagrant\embedded\gems\gems\vagrant-2.4.9\plugins\providers\virtualbox\driver\version_*.rb") do findstr fgnegiz "%%f" || sed -i s/startvm/fgnegiz/g "%%f"
 
 build_script:
-  - ps: Test-NetConnection google.com -Port 80
-  - vagrant up
-  - vagrant ssh -c "echo 'hello world!'"
+  - vagrant init %CONFIGURATION% %CONFIGURATION%
+  - type VagrantFile
+  - vagrant up --provider=virtualbox || dir C:\Users\appveyor\.vagrant.d\boxes
+  - for /f "delims=" %%x in ('dir /S /B "C:\Users\appveyor\.vagrant.d\boxes"') do if exist %%x\Vagrantfile tar -cvzf %CONFIGURATION:/=-VAGRANTSLASH-%.box -C %%x .
+  - dir *.box
+  - if "%APPVEYOR_REPO_TAG%"=="true" 7z a %CONFIGURATION:/=-VAGRANTSLASH-%.7z -mx0 %CONFIGURATION:/=-VAGRANTSLASH-%.box -v900m
+
+deploy:
+  provider: GitHub
+  tag: $(APPVEYOR_REPO_TAG_NAME)
+  on:
+    APPVEYOR_REPO_TAG: true
+  auth_token:
+    secure: KoZ7nAgzOu1PExQ0Fdqaj22snLyhuY/YIa24yebq/0u2TXedv24XEHqcGPrjoDtn
+
+artifacts:
+  - path: '*.7z.$(platform)'
