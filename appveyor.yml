@@ -1,20 +1,23 @@
 version: '1.0.{build}-{branch}'
 image: Visual Studio 2017
 
+# https://github.com/appveyor/ci/issues/3084
+# https://help.appveyor.com/discussions/problems/27666-how-can-i-delete-old-build-artifacts
+
 configuration:
-  - datadiode/MX-23
-  - datadiode/MX-25
-  - datadiode/Peppermint-2023
-  - datadiode/Peppermint-2025
+  # - datadiode/MX-23
+  # - datadiode/MX-25
+  # - datadiode/Peppermint-2023
+  # - datadiode/Peppermint-2025
   - datadiode/Sparky-7
   - datadiode/Sparky-8
-  - datadiode/Sparky-9
-  - datadiode/w7sbash
-  - datadiode/w8sbash
-  - datadiode/w9sbash
-  - datadiode/w10sbash
-  - datadiode/w11sbash
-  - datadiode/w11sbash-eval
+  # - datadiode/Sparky-9
+  # - datadiode/w7sbash
+  # - datadiode/w8sbash
+  # - datadiode/w9sbash
+  # - datadiode/w10sbash
+  # - datadiode/w11sbash
+  # - datadiode/w11sbash-eval
 
 platform:
   - 001
@@ -24,6 +27,14 @@ platform:
   - 005
   - 006
 
+for:
+-
+  matrix:
+    except:
+      - configuration: n/a
+
+  skip_tags: true
+
 cache:
   - C:\Vagrant
 
@@ -31,6 +42,8 @@ init:
   - set APPVEYOR_CACHE_SKIP_SAVE=true
 
 install:
+  - for /f "tokens=1,2 delims=/" %%x in ("%CONFIGURATION%") do curl -fI https://github.com/datadiode/%APPVEYOR_PROJECT_NAME%/releases/download/%%x%%2F%%y/%%x-VAGRANTSLASH-%%y.7z.%PLATFORM% && set APPVEYOR_EXIT=1 || cd .
+  - if defined APPVEYOR_EXIT appveyor exit
   - choco install virtualbox --yes
   - set PATH=C:\Vagrant\Vagrant\bin;%PATH%
   - where vagrant || curl -LO https://releases.hashicorp.com/vagrant/2.4.9/vagrant_2.4.9_windows_amd64.msi && msiexec.exe /a vagrant_2.4.9_windows_amd64.msi /qb TARGETDIR=C:\Vagrant
@@ -44,7 +57,7 @@ build_script:
   - for /f "delims=" %%x in ('dir /S /B "C:\Users\appveyor\.vagrant.d\boxes"') do if exist %%x\Vagrantfile tar -cvzf %CONFIGURATION:/=-VAGRANTSLASH-%.box -C %%x .
   - dir *.box
   - 7z a %CONFIGURATION:/=-VAGRANTSLASH-%.7z -mx0 %CONFIGURATION:/=-VAGRANTSLASH-%.box -v900m
-  - for %%x in (1 2 3 4 5 6) do touch %CONFIGURATION:/=-VAGRANTSLASH-%.7z.00%%x
+  - if not exist %CONFIGURATION:/=-VAGRANTSLASH-%.7z.%PLATFORM% echo empty > %CONFIGURATION:/=-VAGRANTSLASH-%.7z.%PLATFORM%
 
 deploy:
   provider: GitHub
@@ -53,6 +66,7 @@ deploy:
     branch:
       - master
   skip_tags: true
+  force_update: true
   auth_token:
     secure: KoZ7nAgzOu1PExQ0Fdqaj22snLyhuY/YIa24yebq/0u2TXedv24XEHqcGPrjoDtn
 
