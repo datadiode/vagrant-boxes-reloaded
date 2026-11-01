@@ -24,19 +24,11 @@ platform:
   - 005
   - 006
 
-for:
--
-  matrix:
-    except:
-      - platform: 001
-
-  skip_non_tags: true
-
 cache:
   - C:\Vagrant
 
 init:
-  - set APPVEYOR_CACHE_SKIP_SAVE=%APPVEYOR_REPO_TAG%
+  - set APPVEYOR_CACHE_SKIP_SAVE=true
 
 install:
   - choco install virtualbox --yes
@@ -51,13 +43,16 @@ build_script:
   - vagrant up --provider=virtualbox || dir C:\Users\appveyor\.vagrant.d\boxes
   - for /f "delims=" %%x in ('dir /S /B "C:\Users\appveyor\.vagrant.d\boxes"') do if exist %%x\Vagrantfile tar -cvzf %CONFIGURATION:/=-VAGRANTSLASH-%.box -C %%x .
   - dir *.box
-  - if "%APPVEYOR_REPO_TAG%"=="true" 7z a %CONFIGURATION:/=-VAGRANTSLASH-%.7z -mx0 %CONFIGURATION:/=-VAGRANTSLASH-%.box -v900m
+  - 7z a %CONFIGURATION:/=-VAGRANTSLASH-%.7z -mx0 %CONFIGURATION:/=-VAGRANTSLASH-%.box -v900m
+  - for %%x in (1 2 3 4 5 6) do touch %CONFIGURATION:/=-VAGRANTSLASH-%.7z.00%%x
 
 deploy:
   provider: GitHub
-  tag: $(APPVEYOR_REPO_TAG_NAME)
+  tag: $(CONFIGURATION)
   on:
-    APPVEYOR_REPO_TAG: true
+    branch:
+      - master
+  skip_tags: true
   auth_token:
     secure: KoZ7nAgzOu1PExQ0Fdqaj22snLyhuY/YIa24yebq/0u2TXedv24XEHqcGPrjoDtn
 
